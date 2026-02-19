@@ -4,7 +4,7 @@
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Status](https://img.shields.io/badge/Status-In%20Development-yellow.svg)]()
 
-Student mini-project: anomaly detection on simulated flight telemetry data using statistical methods.
+Anomaly detection on simulated flight telemetry data using statistical methods.
 
 ![Flight Analysis](outputs/figures/flight_analysis.png)
 
