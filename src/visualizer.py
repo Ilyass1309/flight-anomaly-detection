@@ -226,6 +226,175 @@ def plot_correlation_matrix(
     return fig
 
 
+def plot_ml_comparison(
+    stat_results: pd.DataFrame,
+    ml_results: pd.DataFrame,
+    save_path: Optional[str] = None,
+    figsize: Tuple[int, int] = (18, 12)
+) -> plt.Figure:
+    """
+    Compare statistical and machine learning detection methods.
+    
+    Parameters
+    ----------
+    stat_results : pd.DataFrame
+        Results from statistical detector (with 'anomaly' column)
+    ml_results : pd.DataFrame
+        Results from ML detector (with 'anomaly_ml' column)
+    save_path : str, optional
+        Path to save the figure
+    figsize : tuple, default=(18, 12)
+        Figure size (width, height)
+        
+    Returns
+    -------
+    matplotlib.figure.Figure
+        The created figure
+    """
+    fig, axes = plt.subplots(2, 2, figsize=figsize)
+    fig.suptitle('Statistical vs Machine Learning Anomaly Detection Comparison', 
+                 fontsize=16, fontweight='bold', y=0.995)
+    
+    # Plot 1: Z-Score Detection
+    scatter1 = axes[0, 0].scatter(
+        stat_results['altitude_ft'], 
+        stat_results['speed_knots'],
+        c=stat_results['anomaly'], 
+        cmap='RdYlGn_r',
+        alpha=0.6,
+        s=20,
+        edgecolors='black',
+        linewidth=0.5
+    )
+    axes[0, 0].set_title('Z-Score Detection (Statistical)', fontsize=12, fontweight='bold')
+    axes[0, 0].set_xlabel('Altitude (ft)', fontweight='bold')
+    axes[0, 0].set_ylabel('Speed (knots)', fontweight='bold')
+    axes[0, 0].grid(True, alpha=0.3)
+    
+    # Add colorbar
+    cbar1 = plt.colorbar(scatter1, ax=axes[0, 0])
+    cbar1.set_label('Anomaly', fontweight='bold')
+    
+    # Add statistics
+    stat_count = stat_results['anomaly'].sum()
+    axes[0, 0].text(0.02, 0.98, f'Anomalies: {stat_count} ({stat_count/len(stat_results)*100:.1f}%)',
+                    transform=axes[0, 0].transAxes, fontsize=10,
+                    verticalalignment='top',
+                    bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
+    
+    # Plot 2: Isolation Forest Detection
+    scatter2 = axes[0, 1].scatter(
+        ml_results['altitude_ft'], 
+        ml_results['speed_knots'],
+        c=ml_results['anomaly_ml'], 
+        cmap='RdYlGn_r',
+        alpha=0.6,
+        s=20,
+        edgecolors='black',
+        linewidth=0.5
+    )
+    axes[0, 1].set_title('Isolation Forest Detection (ML)', fontsize=12, fontweight='bold')
+    axes[0, 1].set_xlabel('Altitude (ft)', fontweight='bold')
+    axes[0, 1].set_ylabel('Speed (knots)', fontweight='bold')
+    axes[0, 1].grid(True, alpha=0.3)
+    
+    # Add colorbar
+    cbar2 = plt.colorbar(scatter2, ax=axes[0, 1])
+    cbar2.set_label('Anomaly', fontweight='bold')
+    
+    # Add statistics
+    ml_count = ml_results['anomaly_ml'].sum()
+    axes[0, 1].text(0.02, 0.98, f'Anomalies: {ml_count} ({ml_count/len(ml_results)*100:.1f}%)',
+                    transform=axes[0, 1].transAxes, fontsize=10,
+                    verticalalignment='top',
+                    bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
+    
+    # Plot 3: Overlap Analysis
+    both = (stat_results['anomaly']) & (ml_results['anomaly_ml'])
+    only_stat = (stat_results['anomaly']) & (~ml_results['anomaly_ml'])
+    only_ml = (~stat_results['anomaly']) & (ml_results['anomaly_ml'])
+    neither = (~stat_results['anomaly']) & (~ml_results['anomaly_ml'])
+    
+    # Create color array for overlap
+    colors = np.zeros(len(stat_results))
+    colors[both] = 3        # Both methods - red
+    colors[only_stat] = 2   # Only statistical - orange
+    colors[only_ml] = 1     # Only ML - yellow
+    colors[neither] = 0     # Neither - green
+    
+    scatter3 = axes[1, 0].scatter(
+        stat_results['altitude_ft'], 
+        stat_results['speed_knots'],
+        c=colors,
+        cmap='RdYlGn_r',
+        alpha=0.6,
+        s=20,
+        edgecolors='black',
+        linewidth=0.5
+    )
+    axes[1, 0].set_title('Method Overlap Analysis', fontsize=12, fontweight='bold')
+    axes[1, 0].set_xlabel('Altitude (ft)', fontweight='bold')
+    axes[1, 0].set_ylabel('Speed (knots)', fontweight='bold')
+    axes[1, 0].grid(True, alpha=0.3)
+    
+    # Add legend for overlap
+    from matplotlib.patches import Patch
+    legend_elements = [
+        Patch(facecolor='darkred', label=f'Both methods ({both.sum()})'),
+        Patch(facecolor='orange', label=f'Only Z-Score ({only_stat.sum()})'),
+        Patch(facecolor='yellow', label=f'Only ML ({only_ml.sum()})'),
+        Patch(facecolor='green', label=f'Normal ({neither.sum()})')
+    ]
+    axes[1, 0].legend(handles=legend_elements, loc='upper right', fontsize=9)
+    
+    # Plot 4: Comparison Statistics
+    axes[1, 1].axis('off')
+    
+    # Calculate statistics
+    agreement = both.sum()
+    total_anomalies = max(stat_count, ml_count)
+    agreement_rate = (agreement / total_anomalies * 100) if total_anomalies > 0 else 0
+    
+    stats_text = f"""
+    COMPARISON STATISTICS
+    {'='*40}
+    
+    Total Data Points:          {len(stat_results):,}
+    
+    Z-Score Anomalies:          {stat_count} ({stat_count/len(stat_results)*100:.2f}%)
+    Isolation Forest Anomalies: {ml_count} ({ml_count/len(ml_results)*100:.2f}%)
+    
+    Agreement:
+    ├─ Both methods:            {both.sum()} ({both.sum()/len(stat_results)*100:.2f}%)
+    ├─ Only Z-Score:            {only_stat.sum()} ({only_stat.sum()/len(stat_results)*100:.2f}%)
+    ├─ Only Isolation Forest:   {only_ml.sum()} ({only_ml.sum()/len(ml_results)*100:.2f}%)
+    └─ Neither (Normal):        {neither.sum()} ({neither.sum()/len(stat_results)*100:.2f}%)
+    
+    Agreement Rate:             {agreement_rate:.1f}%
+    
+    Anomaly Score Statistics (ML):
+    ├─ Min (most anomalous):    {ml_results['anomaly_score'].min():.4f}
+    ├─ Max (most normal):       {ml_results['anomaly_score'].max():.4f}
+    ├─ Mean:                    {ml_results['anomaly_score'].mean():.4f}
+    └─ Median:                  {ml_results['anomaly_score'].median():.4f}
+    """
+    
+    axes[1, 1].text(0.1, 0.95, stats_text, 
+                    transform=axes[1, 1].transAxes,
+                    fontsize=10,
+                    verticalalignment='top',
+                    fontfamily='monospace',
+                    bbox=dict(boxstyle='round', facecolor='lightgray', alpha=0.8))
+    
+    plt.tight_layout()
+    
+    if save_path:
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')
+        print(f"ML comparison plot saved to: {save_path}")
+    
+    return fig
+
+
 if __name__ == "__main__":
     print("This module contains visualization functions.")
     print("To test it, run: python test_visualizer.py")
